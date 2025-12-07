@@ -6,9 +6,16 @@ import {
 import { randomBytes } from 'crypto';
 import { InMemoryStorage, ApiKey } from '../database/storage';
 import { CreateApiKeyDto, ApiKeyResponse, ApiKeyListItem } from './keys.dto';
+import { Repository } from 'typeorm';
+import { ApiKey as ApiKeyEntity } from './keys.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class KeysService {
+  constructor(
+    @InjectRepository(ApiKeyEntity)
+    private readonly keysRepository: Repository<ApiKeyEntity>,
+  ) {}
   createApiKey(
     userId: string,
     createApiKeyDto: CreateApiKeyDto,
@@ -36,19 +43,19 @@ export class KeysService {
       lastUsedAt: null,
     };
 
-    InMemoryStorage.createApiKey(apiKey);
+    this.keysRepository.save(apiKey);
 
     return {
       id: apiKey.id,
-      key: apiKey.key, // Only returned on creation
+      key: apiKey.key,
       name: apiKey.name,
       createdAt: apiKey.createdAt,
       expiresAt: apiKey.expiresAt,
     };
   }
 
-  listApiKeys(userId: string): ApiKeyListItem[] {
-    const apiKeys = InMemoryStorage.findApiKeysByUserId(userId);
+  async listApiKeys(userId: string): Promise<ApiKeyListItem[]> {
+    const apiKeys = await this.keysRepository.find({ where: { userId } });
 
     return apiKeys.map((apiKey) => ({
       id: apiKey.id,
@@ -61,21 +68,26 @@ export class KeysService {
     }));
   }
 
-  revokeApiKey(userId: string, keyId: string): { message: string } {
-    const apiKeys = InMemoryStorage.findApiKeysByUserId(userId);
+  async revokeApiKey(
+    userId: string,
+    keyId: string,
+  ): Promise<{ message: string }> {
+    const apiKeys = await this.keysRepository.find({ where: { userId } });
     const apiKey = apiKeys.find((k) => k.id === keyId);
 
     if (!apiKey) {
       throw new NotFoundException('API key not found');
     }
 
-    InMemoryStorage.updateApiKey(apiKey.key, { revoked: true });
+    await this.keysRepository.update(apiKey.id, { revoked: true });
 
     return { message: 'API key revoked successfully' };
   }
 
-  validateApiKey(key: string): { userId: string; type: string } | null {
-    const apiKey = InMemoryStorage.findApiKeyByKey(key);
+  async validateApiKey(
+    key: string,
+  ): Promise<{ userId: string; type: string } | null> {
+    const apiKey = await this.keysRepository.findOne({ where: { key } });
 
     if (!apiKey) {
       return null;
@@ -92,7 +104,7 @@ export class KeysService {
     }
 
     // Update last used timestamp
-    InMemoryStorage.updateApiKey(key, { lastUsedAt: new Date() });
+    await this.keysRepository.update(apiKey.id, { lastUsedAt: new Date() });
 
     return {
       userId: apiKey.userId,

@@ -8,16 +8,24 @@ import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { InMemoryStorage, User } from '../database/storage';
 import { SignupDto, LoginDto, AuthResponse, JwtPayload } from './auth.dto';
-
+import { Repository } from 'typeorm';
+import { User as UserEntity } from './user.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 @Injectable()
 export class AuthService {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
+  ) {}
 
   async signup(signupDto: SignupDto): Promise<AuthResponse> {
     const { email, password } = signupDto;
 
     // Check if user already exists
-    const existingUser = InMemoryStorage.findUserByEmail(email);
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
@@ -33,7 +41,7 @@ export class AuthService {
       createdAt: new Date(),
     };
 
-    InMemoryStorage.createUser(user);
+    await this.userRepository.save(user);
 
     // Generate JWT token
     const token = this.generateToken(user);
@@ -51,7 +59,7 @@ export class AuthService {
     const { email, password } = loginDto;
 
     // Find user
-    const user = InMemoryStorage.findUserByEmail(email);
+    const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -81,10 +89,16 @@ export class AuthService {
       type: 'user',
     };
 
-    return this.jwtService.sign(payload);
+    const token = this.jwtService.sign(payload);
+    console.log('🔐 Token signed with payload:', payload);
+    console.log('🔐 Generated token:', token);
+
+    return token;
   }
 
-  validateUser(userId: string): User | undefined {
-    return InMemoryStorage.findUserById(userId);
+  async validateUser(userId: string): Promise<User | undefined> {
+    return this.userRepository.findOne({ where: { id: userId } }) as Promise<
+      User | undefined
+    >;
   }
 }

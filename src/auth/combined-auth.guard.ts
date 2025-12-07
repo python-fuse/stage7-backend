@@ -37,6 +37,7 @@ export class CombinedAuthGuard implements CanActivate {
 
     // Try JWT authentication first
     if (bearerToken) {
+      console.log('Attempting JWT authentication', bearerToken);
       try {
         const payload = this.jwtService.verify(bearerToken, {
           secret:
@@ -64,7 +65,7 @@ export class CombinedAuthGuard implements CanActivate {
 
     // Try API key authentication
     if (apiKey) {
-      const result = this.keysService.validateApiKey(apiKey);
+      const result = await this.keysService.validateApiKey(apiKey);
 
       if (!result) {
         throw new UnauthorizedException('Invalid API key');

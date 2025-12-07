@@ -1,10 +1,7 @@
-// Simple in-memory storage for demo purposes
-// In production, use a real database like PostgreSQL, MongoDB, etc.
-
 export interface User {
   id: string;
   email: string;
-  password: string; // hashed
+  password: string;
   createdAt: Date;
 }
 
@@ -68,7 +65,7 @@ export class InMemoryStorage {
     return Array.from(this.apiKeys.values());
   }
 
-  // Clear all data (useful for testing)
+  // Clear all data
   static clear() {
     this.users.clear();
     this.apiKeys.clear();

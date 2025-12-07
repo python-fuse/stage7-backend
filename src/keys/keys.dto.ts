@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsOptional, IsNumber } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsNumber,
+  Min,
+} from 'class-validator';
 
 export class CreateApiKeyDto {
   @IsString()
@@ -7,7 +13,8 @@ export class CreateApiKeyDto {
 
   @IsOptional()
   @IsNumber()
-  expiresInDays?: number; // Optional: API key expiration in days
+  @Min(1)
+  expiresInDays?: number;
 }
 
 export interface ApiKeyResponse {
@@ -25,5 +32,5 @@ export interface ApiKeyListItem {
   expiresAt: Date | null;
   revoked: boolean;
   lastUsedAt: Date | null;
-  keyPreview: string; // Only show first few characters
+  keyPreview: string;
 }

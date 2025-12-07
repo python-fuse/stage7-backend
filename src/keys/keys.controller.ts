@@ -14,7 +14,7 @@ import { CreateApiKeyDto } from './keys.dto';
 import type { ApiKeyResponse, ApiKeyListItem } from './keys.dto';
 
 @Controller('keys')
-@UseGuards(JwtAuthGuard) // All routes require JWT authentication
+@UseGuards(JwtAuthGuard)
 export class KeysController {
   constructor(private readonly keysService: KeysService) {}
 
@@ -27,15 +27,15 @@ export class KeysController {
   }
 
   @Get()
-  listApiKeys(@Request() req): ApiKeyListItem[] {
+  async listApiKeys(@Request() req): Promise<ApiKeyListItem[]> {
     return this.keysService.listApiKeys(req.user.userId);
   }
 
   @Delete(':keyId')
-  revokeApiKey(
+  async revokeApiKey(
     @Param('keyId') keyId: string,
     @Request() req,
-  ): { message: string } {
+  ): Promise<{ message: string }> {
     return this.keysService.revokeApiKey(req.user.userId, keyId);
   }
 }
