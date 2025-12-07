@@ -32,5 +32,4 @@ export interface ApiKeyListItem {
   expiresAt: Date | null;
   revoked: boolean;
   lastUsedAt: Date | null;
-  keyPreview: string;
 }

@@ -3,7 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { InMemoryStorage, ApiKey } from '../database/storage';
 import { CreateApiKeyDto, ApiKeyResponse, ApiKeyListItem } from './keys.dto';
 import { Repository } from 'typeorm';
@@ -16,14 +16,20 @@ export class KeysService {
     @InjectRepository(ApiKeyEntity)
     private readonly keysRepository: Repository<ApiKeyEntity>,
   ) {}
-  createApiKey(
+
+  private hashApiKey(key: string): string {
+    return createHash('sha256').update(key).digest('hex');
+  }
+
+  async createApiKey(
     userId: string,
     createApiKeyDto: CreateApiKeyDto,
-  ): ApiKeyResponse {
+  ): Promise<ApiKeyResponse> {
     const { name, expiresInDays } = createApiKeyDto;
 
     // Generate a random API key (64 characters hex)
     const key = `sk_${randomBytes(32).toString('hex')}`;
+    const hashedKey = this.hashApiKey(key);
 
     // Calculate expiration date if provided
     let expiresAt: Date | null = null;
@@ -32,22 +38,21 @@ export class KeysService {
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
     }
 
-    const apiKey: ApiKey = {
-      id: randomBytes(16).toString('hex'),
-      key,
+    const apiKey = this.keysRepository.create({
+      key: hashedKey, // Store hashed version
       userId,
       name,
-      createdAt: new Date(),
       expiresAt,
       revoked: false,
       lastUsedAt: null,
-    };
+    });
 
-    this.keysRepository.save(apiKey);
+    await this.keysRepository.save(apiKey);
 
+    // Return the plain key only once - user must save it!
     return {
       id: apiKey.id,
-      key: apiKey.key,
+      key: key, // Return plain key (not hashed)
       name: apiKey.name,
       createdAt: apiKey.createdAt,
       expiresAt: apiKey.expiresAt,
@@ -64,7 +69,6 @@ export class KeysService {
       expiresAt: apiKey.expiresAt,
       revoked: apiKey.revoked,
       lastUsedAt: apiKey.lastUsedAt,
-      keyPreview: apiKey.key.substring(0, 10) + '...',
     }));
   }
 
@@ -87,7 +91,10 @@ export class KeysService {
   async validateApiKey(
     key: string,
   ): Promise<{ userId: string; type: string } | null> {
-    const apiKey = await this.keysRepository.findOne({ where: { key } });
+    const hashedKey = this.hashApiKey(key);
+    const apiKey = await this.keysRepository.findOne({
+      where: { key: hashedKey },
+    });
 
     if (!apiKey) {
       return null;
